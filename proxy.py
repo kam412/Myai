@@ -58,7 +58,9 @@ if not MODEL_KEYS:
 
 NVIDIA_ENDPOINT = "https://integrate.api.nvidia.com/v1/chat/completions"
 LISTEN_HOST = "0.0.0.0"
-LISTEN_PORT = 8787
+# Render (and similar hosts) assign a port dynamically via $PORT.
+# Falls back to 8787 for local/Codespaces use where that's not set.
+LISTEN_PORT = int(os.environ.get("PORT", 8787))
 # ---------------------------------------------------------------------------
 
 
@@ -73,6 +75,22 @@ class ProxyHandler(BaseHTTPRequestHandler):
         self.send_response(204)
         self._cors_headers()
         self.end_headers()
+
+    def do_GET(self):
+        # Lightweight endpoint for an external uptime monitor to ping.
+        # This is what keeps a free Render instance from going to sleep --
+        # point a service like UptimeRobot at https://your-app.onrender.com/ping
+        if self.path == "/ping":
+            self.send_response(200)
+            self._cors_headers()
+            self.send_header("Content-Type", "text/plain")
+            self.end_headers()
+            self.wfile.write(b"OK")
+        else:
+            self.send_response(404)
+            self._cors_headers()
+            self.end_headers()
+            self.wfile.write(b"Not found. POST to /chat, or GET /ping.")
 
     def do_POST(self):
         if self.path != "/chat":
